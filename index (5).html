@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>Security Terminal | Prank Simulation</title>
+<style>
+  :root{
+    --green:#00ff66;
+    --dim:#0a8f45;
+    --red:#ff2a45;
+    --amber:#ffcc00;
+    --panel:rgba(0,14,6,.88);
+    --font:"Cascadia Code","Fira Code",Consolas,Menlo,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{background:#000;min-height:100%}
+  body{
+    color:var(--green);
+    font-family:var(--font);
+    overflow-x:hidden;
+    text-shadow:0 0 6px rgba(0,255,102,.55);
+  }
+  #matrix{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.38}
+  body::after{ /* CRT scanlines */
+    content:"";position:fixed;inset:0;z-index:50;pointer-events:none;
+    background:repeating-linear-gradient(to bottom,transparent 0 2px,rgba(0,0,0,.22) 3px,transparent 4px);
+  }
+
+  .screen{
+    position:relative;z-index:1;
+    min-height:100vh;min-height:100dvh;
+    display:flex;padding:16px;
+  }
+  .box{
+    background:var(--panel);
+    border:1px solid var(--green);
+    border-radius:8px;
+    box-shadow:0 0 12px rgba(0,255,102,.45),inset 0 0 22px rgba(0,255,102,.1);
+  }
+  button{
+    font-family:var(--font);font-size:1rem;font-weight:700;letter-spacing:2px;
+    color:var(--green);background:#001a0a;
+    border:2px solid var(--green);border-radius:6px;
+    padding:14px 24px;cursor:pointer;
+    box-shadow:0 0 16px rgba(0,255,102,.5);
+    transition:background .2s,color .2s,transform .1s;
+  }
+  button:hover{background:var(--green);color:#000;text-shadow:none}
+  button:active{transform:scale(.96)}
+  button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+
+  /* ---------- Start screen ---------- */
+  #startScreen .box{margin:auto;width:min(480px,100%);padding:36px 22px;text-align:center}
+  .shield{font-size:3rem;margin-bottom:12px}
+  #startScreen h1{font-size:clamp(1.3rem,6vw,2rem);letter-spacing:3px;margin-bottom:10px}
+  #startScreen p{color:#8dffb9;font-size:.85rem;margin-bottom:26px;line-height:1.6}
+  .sound-row{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:20px;font-size:.8rem;cursor:pointer}
+  .sound-row input{accent-color:var(--green);width:16px;height:16px}
+
+  /* ---------- Dashboard ---------- */
+  .dashboard{
+    margin:auto;width:min(1050px,100%);
+    display:grid;gap:14px;
+    grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);
+  }
+  header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;font-size:.85rem;letter-spacing:2px}
+  .live{display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 1.2s infinite}
+  .title-bar{padding:9px 14px;border-bottom:1px solid var(--dim);font-size:.72rem;letter-spacing:2px;color:#8dffb9}
+  .terminal{display:flex;flex-direction:column;min-width:0}
+  #log{
+    height:340px;overflow-y:auto;padding:14px;
+    font-size:clamp(.74rem,2.6vw,.95rem);line-height:1.7;
+    scrollbar-width:thin;scrollbar-color:var(--dim) transparent;
+  }
+  .line{overflow-wrap:anywhere}
+  .line.sub{color:var(--dim);font-size:.85em;text-shadow:none}
+  .line.warn{color:var(--amber);text-shadow:0 0 8px var(--amber);font-weight:700}
+  .cursor{display:inline-block;width:.6em;height:1.1em;margin-left:4px;vertical-align:text-bottom;background:currentColor;animation:blink .8s steps(1) infinite}
+  .progress-wrap{padding:14px;border-top:1px solid var(--dim)}
+  .progress-label{display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:8px;letter-spacing:1px}
+  .progress{height:18px;border:1px solid var(--green);border-radius:4px;padding:2px;box-shadow:0 0 8px rgba(0,255,102,.35)}
+  #bar{height:100%;width:0;background:repeating-linear-gradient(45deg,var(--green) 0 8px,#00c94f 8px 16px);box-shadow:0 0 14px var(--green)}
+
+  aside{display:grid;gap:14px;align-content:start;min-width:0}
+  .radar-body{padding:16px;display:flex;justify-content:center}
+  .radar{
+    width:130px;height:130px;border-radius:50%;position:relative;border:1px solid var(--green);
+    background:
+      radial-gradient(circle,transparent 30%,rgba(0,255,102,.35) 31%,transparent 32%,transparent 63%,rgba(0,255,102,.35) 64%,transparent 65%),
+      linear-gradient(var(--dim),var(--dim)) center/1px 100% no-repeat,
+      linear-gradient(var(--dim),var(--dim)) center/100% 1px no-repeat;
+  }
+  .radar::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(rgba(0,255,102,.65),transparent 90deg);animation:spin 2.4s linear infinite}
+  .meters{padding:12px 14px;font-size:.7rem}
+  .meter{margin-bottom:10px}
+  .meter:last-child{margin-bottom:0}
+  .meter span{display:block;margin-bottom:4px}
+  .meter i{display:block;height:6px;background:var(--green);box-shadow:0 0 8px var(--green);width:20%;transition:width .5s}
+  #hex{padding:12px 14px;font-size:.68rem;line-height:1.6;color:var(--dim);white-space:pre;overflow:hidden;height:98px}
+
+  /* Warning state */
+  body.alert .box{border-color:var(--amber);box-shadow:0 0 20px rgba(255,204,0,.55),inset 0 0 22px rgba(255,204,0,.12)}
+
+  /* ---------- Final screen ---------- */
+  #finalScreen .report{
+    margin:auto;width:min(720px,100%);padding:30px 18px;text-align:center;
+    border-width:2px;animation:zoomIn .6s ease both;
+    transition:border-color 1.4s,box-shadow 1.4s,background-color 1.4s;
+  }
+  .report h2{font-size:clamp(1.35rem,6.5vw,2.6rem);letter-spacing:2px;margin-bottom:24px}
+  .stat{font-size:clamp(1rem,4.6vw,1.45rem);font-weight:700;margin:12px 0;line-height:1.5}
+  #finalScreen.red .report{border-color:var(--red);background:rgba(30,0,5,.92);box-shadow:0 0 40px var(--red),inset 0 0 40px rgba(255,42,69,.25);animation:zoomIn .6s ease both,shake .5s .6s 3}
+  #finalScreen.red .report h2,#finalScreen.red .stat{color:var(--red);text-shadow:0 0 10px var(--red),0 0 26px var(--red)}
+  #finalScreen.safe .report{border-color:var(--green);background:rgba(0,22,9,.93);box-shadow:0 0 45px var(--green),inset 0 0 40px rgba(0,255,102,.2);animation:none}
+  .report h2,.stat{transition:color 1.4s,text-shadow 1.4s}
+  .reveal{margin-top:26px;padding-top:22px;border-top:1px dashed var(--green)}
+  .reveal p{margin:16px 0;font-weight:800;line-height:1.45;opacity:0;transform:translateY(16px);transition:opacity .6s,transform .6s}
+  .reveal p.show{opacity:1;transform:none}
+  .reveal .big{font-size:clamp(1.4rem,7vw,2.4rem);text-shadow:0 0 12px var(--green),0 0 32px var(--green)}
+  .reveal .mid{font-size:clamp(1.05rem,5vw,1.5rem);color:#c9ffdd}
+  .reveal .fun{font-size:clamp(1.15rem,5.6vw,1.8rem);color:#fff;text-shadow:0 0 10px #ff5fa2,0 0 24px #ff5fa2}
+  #againBtn{margin-top:18px;animation:zoomIn .4s ease both}
+
+  footer{position:relative;z-index:1;text-align:center;font-size:.65rem;color:#5fbf86;padding:8px 12px;background:#000}
+  .screen{min-height:calc(100vh - 34px);min-height:calc(100dvh - 34px)}
+
+  @keyframes blink{50%{opacity:0}}
+  @keyframes pulse{50%{opacity:.3}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes zoomIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+  @keyframes shake{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+
+  @media (max-width:760px){
+    .screen{padding:10px}
+    .dashboard{grid-template-columns:minmax(0,1fr);gap:10px}
+    #log{height:44vh;min-height:230px}
+    aside{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .hex-box{display:none}
+    .radar{width:90px;height:90px}
+    .radar-body{padding:10px}
+    header{font-size:.7rem;letter-spacing:1px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .radar::after,.dot{animation:none}
+    #finalScreen.red .report{animation:none}
+    #matrix{opacity:.18}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix" aria-hidden="true"></canvas>
+
+<!-- START SCREEN -->
+<main class="screen" id="startScreen">
+  <div class="box">
+    <div class="shield" aria-hidden="true">🛡️</div>
+    <h1>SECURITY TERMINAL</h1>
+    <p>System ready. Diagnostic shuru karne ke liye button dabao.</p>
+    <button id="startBtn" type="button">▶ START SCAN</button>
+    <label class="sound-row"><input type="checkbox" id="soundToggle" checked> Terminal sounds 🔊</label>
+  </div>
+</main>
+
+<!-- SCANNING DASHBOARD -->
+<main class="screen" id="scanScreen" hidden>
+  <div class="dashboard">
+    <header class="box">
+      <span>⌘ CYBER//CONSOLE v4.2</span>
+      <span class="live"><span class="dot"></span><span id="status">ONLINE</span></span>
+    </header>
+
+    <section class="box terminal">
+      <div class="title-bar">● ● ●  root@console:~</div>
+      <div id="log" role="log" aria-live="polite"></div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>SCAN PROGRESS</span><span id="percent">0%</span></div>
+        <div class="progress" id="progressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="bar"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="box">
+        <div class="title-bar">RADAR</div>
+        <div class="radar-body"><div class="radar"></div></div>
+      </div>
+      <div class="box">
+        <div class="title-bar">LIVE METRICS</div>
+        <div class="meters">
+          <div class="meter"><span>FIREWALL</span><i></i></div>
+          <div class="meter"><span>ENCRYPTION</span><i></i></div>
+          <div class="meter"><span>SIGNAL</span><i></i></div>
+        </div>
+      </div>
+      <div class="box hex-box">
+        <div class="title-bar">DATA STREAM</div>
+        <div id="hex" aria-hidden="true"></div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<!-- FINAL SURPRISE SCREEN -->
+<main class="screen" id="finalScreen" hidden>
+  <div class="box report" aria-live="assertive">
+    <h2>🚨&nbsp;SECURITY REPORT&nbsp;🚨</h2>
+    <div class="stat">TARGET: <span id="targetName"></span></div>
+    <div class="stat">THREAT LEVEL: TOO MUCH ATTITUDE 😂</div>
+
+    <div class="reveal" id="reveal" hidden>
+      <p class="big" id="msg1"></p>
+      <p class="mid" id="msg2"></p>
+      <p class="fun" id="msg3"></p>
+      <button id="againBtn" type="button" hidden>RUN AGAIN 🔄</button>
+    </div>
+  </div>
+</main>
+
+<footer>Fictional prank animation • No real scan, no data collected</footer>
+
+<script>
+"use strict";
+
+/* ====== NAAM YAHAN BADLO ====== */
+const TARGET = "Kunal";
+const SENDER = "Bhagya";
+/* ============================== */
+
+const $ = id => document.getElementById(id);
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+/* ---------- Matrix rain ---------- */
+const canvas = $("matrix");
+const ctx = canvas.getContext("2d");
+const CHARS = "アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF<>/*+-=";
+const SIZE = 16;
+let drops = [];
+let rainColor = "#00ff66";
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const columns = Math.ceil(canvas.width / SIZE);
+  drops = Array.from({ length: columns }, (_, i) => drops[i] ?? rand(-40, 0));
+}
+
+function drawRain() {
+  ctx.fillStyle = "rgba(0,0,0,0.09)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = rainColor;
+  ctx.font = SIZE + "px monospace";
+  drops.forEach((y, i) => {
+    ctx.fillText(CHARS[rand(0, CHARS.length - 1)], i * SIZE, y * SIZE);
+    drops[i] = (y * SIZE > canvas.height && Math.random() > 0.975) ? 0 : y + 1;
+  });
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+setInterval(drawRain, 55);
+
+/* ---------- Sounds (Web Audio, no files) ---------- */
+let audio = null;
+
+function initAudio() {
+  if (!$("soundToggle").checked) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  audio = audio || new AudioCtx();
+  if (audio.state === "suspended") audio.resume();
+}
+
+function beep(freq, duration = 0.05, type = "square", volume = 0.04, delay = 0) {
+  if (!audio || !$("soundToggle").checked) return;
+  const start = audio.currentTime + delay;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(start);
+  osc.stop(start + duration);
+}
+
+const sounds = {
+  key:     () => beep(rand(900, 1300), 0.025, "square", 0.015),
+  step:    () => beep(660, 0.1),
+  warning: () => [0, 0.28, 0.56].forEach(d => beep(320, 0.2, "sawtooth", 0.07, d)),
+  siren:   () => [0, 0.3, 0.6, 0.9].forEach((d, i) => beep(i % 2 ? 440 : 620, 0.28, "sawtooth", 0.06, d)),
+  success: () => [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.25, "triangle", 0.09, i * 0.13))
+};
+
+/* ---------- Terminal helpers ---------- */
+const log = $("log");
+const cursor = document.createElement("span");
+cursor.className = "cursor";
+
+async function typeLine(text, className = "", speed = 32) {
+  const line = document.createElement("div");
+  line.className = "line " + className;
+  const content = document.createElement("span");
+  line.append(content, cursor);
+  log.appendChild(line);
+
+  const letters = Array.from(text); // emoji ko tootne se bachata hai
+  for (let i = 0; i < letters.length; i++) {
+    content.textContent += letters[i];
+    if (i % 3 === 0) sounds.key();
+    log.scrollTop = log.scrollHeight;
+    await wait(speed);
+  }
+}
+
+let progress = 0;
+
+function setProgress(value) {
+  progress = value;
+  $("bar").style.width = value + "%";
+  $("percent").textContent = value + "%";
+  $("progressBar").setAttribute("aria-valuenow", value);
+}
+
+async function progressTo(target) {
+  while (progress < target) {
+    setProgress(progress + 1);
+    await wait(rand(25, 70));
+  }
+}
+
+/* ---------- Fake side-panel animation (sirf random numbers) ---------- */
+let panelTimer = null;
+
+function updatePanels() {
+  document.querySelectorAll(".meter i").forEach(m => m.style.width = rand(25, 100) + "%");
+  const row = () => Array.from({ length: 6 }, () =>
+    rand(0, 255).toString(16).padStart(2, "0").toUpperCase()).join(" ");
+  $("hex").textContent = [row(), row(), row(), row()].join("\n");
+}
+
+/* ---------- Sequence ---------- */
+const STEPS = [
+  { text: "INITIALIZING SECURE CONNECTION...", to: 14,  sub: "> handshake module loaded" },
+  { text: "CONNECTING TO REMOTE SERVER...",    to: 29,  sub: "> virtual node linked", pause: 700 },
+  { text: "ANALYZING SECURITY STATUS...",      to: 43,  sub: "> checking imaginary firewall" },
+  { text: "SCANNING ACCOUNT ACTIVITY...",      to: 62,  sub: "> reading fictional logs", pause: 1200 },
+  { text: "UNUSUAL ACTIVITY DETECTED ⚠️",      to: 71,  sub: "> anomaly flagged", warn: true, pause: 1600 },
+  { text: "RUNNING SECURITY DIAGNOSTICS...",   to: 99,  sub: "> deep check in progress", pause: 1500 },
+  { text: "ANALYSIS COMPLETE...",              to: 100, sub: "> generating report" }
+];
+
+function showScreen(id) {
+  ["startScreen", "scanScreen", "finalScreen"].forEach(s => $(s).hidden = s !== id);
+  window.scrollTo(0, 0);
+}
+
+function resetAll() {
+  log.textContent = "";
+  setProgress(0);
+  document.body.classList.remove("alert");
+  rainColor = "#00ff66";
+  $("status").textContent = "ONLINE";
+  $("finalScreen").className = "screen";
+  $("reveal").hidden = true;
+  $("againBtn").hidden = true;
+  ["msg1", "msg2", "msg3"].forEach(id => $(id).classList.remove("show"));
+}
+
+let running = false;
+
+async function runPrank() {
+  if (running) return;
+  running = true;
+  initAudio();
+  resetAll();
+  showScreen("scanScreen");
+  updatePanels();
+  panelTimer = setInterval(updatePanels, 500);
+
+  for (const step of STEPS) {
+    if (step.warn) {
+      document.body.classList.add("alert");
+      rainColor = "#ffcc00";
+      $("status").textContent = "ALERT";
+      sounds.warning();
+    } else {
+      sounds.step();
+    }
+    await typeLine("$ " + step.text, step.warn ? "warn" : "");
+    await typeLine(step.sub, "sub", 14);
+    await progressTo(step.to);
+    await wait(step.pause || 350);
+  }
+
+  await wait(700);
+  clearInterval(panelTimer);
+  await showFinal();
+  running = false;
+}
+
+async function showFinal() {
+  // Red alert phase
+  document.body.classList.remove("alert");
+  rainColor = "#ff2a45";
+  showScreen("finalScreen");
+  $("finalScreen").classList.add("red");
+  sounds.siren();
+  await wait(3800);
+
+  // Red se green: prank reveal
+  rainColor = "#00ff66";
+  $("finalScreen").classList.replace("red", "safe");
+  $("reveal").hidden = false;
+  sounds.success();
+
+  for (const id of ["msg1", "msg2", "msg3"]) {
+    await wait(id === "msg1" ? 100 : 1300);
+    $(id).classList.add("show");
+    $(id).scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  await wait(900);
+  $("againBtn").hidden = false;
+  $("againBtn").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+$("targetName").textContent = TARGET.toUpperCase();
+$("msg1").textContent = `RELAX ${TARGET.toUpperCase()}! YOUR PHONE IS SAFE.`;
+$("msg2").textContent = "TUMHARA ACCOUNT HACK NAHI HUA...";
+$("msg3").textContent = `BAS ${SENDER.toUpperCase()} TUMHE TANG KAR RAHI THI!\u00a0😂❤️`;
+
+$("startBtn").addEventListener("click", runPrank);
+$("againBtn").addEventListener("click", runPrank);
+</script>
+</body>
+</html>
